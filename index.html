@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI SRT 修字幕工具</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#202124;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}.app{height:100vh;display:flex;flex-direction:column}header{height:60px;background:#fff;border-bottom:1px solid #ddd;padding:0 16px;display:flex;align-items:center;justify-content:space-between}.brand{font-weight:700;font-size:18px}button{border:1px solid #d5d9df;background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:#202124;color:#fff;border-color:#202124}.actions,.row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.main{flex:1;min-height:0;display:grid;grid-template-columns:270px 1fr 390px;gap:10px;padding:10px}.panel{background:#fff;border:1px solid #e0e3e7;border-radius:10px;overflow:hidden;min-height:0}.title{height:46px;border-bottom:1px solid #e6e8eb;padding:0 13px;display:flex;align-items:center;justify-content:space-between;font-weight:700}.list,.editor,.right{height:calc(100% - 46px);overflow:auto}.item{padding:9px 11px;border-bottom:1px solid #eee;cursor:pointer}.item.active{background:#eef1f5;border-left:3px solid #222;padding-left:8px}.meta,.hint{font-size:12px;color:#777}.txt{font-size:13px;line-height:1.45;white-space:pre-wrap;margin-top:4px}.editor{padding:15px}.right{padding:12px}.drop{border:2px dashed #cbd0d6;border-radius:10px;padding:35px;text-align:center;color:#777;cursor:pointer}.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:12px;color:#666;margin-bottom:4px}input,textarea{width:100%;border:1px solid #d5d9df;border-radius:7px;padding:9px;outline:0}textarea{resize:vertical;min-height:180px;font-size:16px;line-height:1.7}.ai{height:230px;font:13px ui-monospace,monospace}.change,.check{padding:9px;border-radius:8px;margin:7px 0;font-size:12px;background:#f5f6f7}.bad{background:#fff1f0;color:#b42318}.good{background:#f0f8f3;color:#176b3a}.warn{background:#fff8e6;color:#8a5a00}.old{color:#a33}.new{color:#176b3a;margin-top:4px}.footer{min-height:52px;background:#fff;border-top:1px solid #ddd;padding:7px 11px;display:flex;align-items:center;gap:7px}.status{margin-left:auto;color:#777;font-size:12px}.hitrow{padding:9px;border-radius:8px;margin:7px 0;font-size:12px;background:#f5f6f7;display:flex;gap:8px}.hitrow.mismatch{background:#fff1f0}.hitrow input[type=checkbox]{width:auto;margin-top:2px}.badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;margin-left:6px}.badge.anchor{background:#e7f0ff;color:#1a4fb4}.badge.global{background:#fff2d9;color:#8a5a00}.badge.suggest{background:#ffe9d6;color:#a5460a}.hitmeta{font-weight:700;cursor:pointer}.restore{background:#fff8e6;border:1px solid #eed58a;border-radius:8px;padding:10px 13px;margin:10px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+@media(max-width:1050px){.main{grid-template-columns:230px 1fr}.right-panel{display:none}}@media(max-width:700px){.main{grid-template-columns:1fr}.list-panel{display:none}}
+</style></head><body>
+<div class="app"><header><div class="brand">AI SRT 修字幕工具</div><div class="actions"><button id="open">匯入 SRT</button><button id="clear">清空</button><button id="download" class="primary">下載 SRT</button><input id="file" type="file" accept=".srt,text/plain" hidden></div></header>
+<div id="restoreBar"></div>
+<div class="main">
+<section class="panel list-panel"><div class="title">字幕列表 <span id="count">0</span></div><div id="list" class="list"><div class="hint" style="padding:20px;text-align:center">請先匯入 SRT</div></div></section>
+<section class="panel"><div class="title"><span id="et">字幕編輯</span><span id="pos">—</span></div><div class="editor"><div id="drop" class="drop">拖曳 SRT 到這裡<br><br>或點擊「匯入 SRT」</div><div id="edit" hidden>
+<div class="grid"><div><label>開始時間</label><input id="start"></div><div><label>結束時間</label><input id="end"></div></div>
+<div style="margin-top:12px"><label>字幕內容</label><textarea id="text" spellcheck="false"></textarea></div>
+<div class="row" style="margin:11px 0"><button id="save" class="primary">儲存</button><button id="prev">← 上一條</button><button id="next">下一條 →</button><button id="merge">與下一條合併</button><button id="split">從中間拆分(複製全文)</button><button id="del">刪除</button></div>
+<div class="hint">Ctrl+S 儲存　↑/↓ 切換　Ctrl+Z 復原</div></div></div></section>
+<section class="panel right-panel"><div class="title">AI 批次修正 <button id="parse">解析指令</button></div><div class="right">
+<button id="copyPrompt" class="primary" style="width:100%;margin-bottom:9px">📋 複製提示詞(貼給 AI 用)</button>
+<label>把 AI 產生的固定格式貼在這裡(建議附上編號或時間碼,才能精準定位)</label><textarea id="ai" class="ai" placeholder="[REPLACE]
+編號：12
+原文：心肌梗塞
+新文：心肌梗死
+
+[REPLACE]
+時間：00:12:34,500
+原文：高血壓
+新文：高血壓疾病
+
+[REPLACE]
+原文：某詞(沒給定位,會列出全部符合的字幕讓你手動勾選)
+新文：某詞修正"></textarea>
+<div class="row" style="margin:10px 0"><button id="apply" class="primary" disabled>套用已勾選的修正</button><button id="selAll">全選</button><button id="selNone">取消全選</button><button id="undo">復原</button></div>
+<div id="result"><div class="hint">解析後會先顯示預覽,不會立即修改 SRT。</div></div>
+<hr style="border:0;border-top:1px solid #eee"><b> SRT 檢查</b><div id="checks"></div>
+</div></section></div>
+<footer class="footer"><span>整份時間</span><input id="shift" type="number" step=".1" value="0" style="width:75px"><span>秒</span><button id="shiftBtn">套用</button><span id="status" class="status">尚未匯入</span></footer></div>
+<script>
+let subs=[],cur=-1,hist=[],rules=[],hits=[],base="fixed",dirty=false,$=id=>document.getElementById(id);
+const AUTOSAVE_KEY="ai_srt_editor_autosave_v3";
+const AI_PROMPT=`你是字幕校對助手。請只找出「確定需要修正」的錯字、聽打錯誤、辨識錯誤、專有名詞錯誤,或同一詞應統一寫法的地方。
+
+請嚴格只用以下格式輸出,每一次出現都要各自列一組,不要合併:
+
+[REPLACE]
+編號：SRT 裡該條字幕的原始編號
+原文：字幕中實際出現的文字(必須跟原文一字不差,包含標點)
+新文：修正後文字
+
+規則：
+1. 每組都必須有 [REPLACE]、編號、原文、新文四個欄位,缺一不可。
+2. 編號一定要照抄 SRT 本身的編號,不要自己重新計算、合併或省略。
+3. 不要輸出時間軸、Markdown、解釋、前言或結尾,只輸出 [REPLACE] 區塊。
+4. 原文必須能在該編號那一條字幕裡直接找到,一字不差。
+5. 同一個錯誤如果在不同編號裡各自出現,每一條都要各自列一組 [REPLACE],不要合併成一條規則。
+6. 只提出高度確定的修正,不確定的不要列。
+7. 不要重寫句子,不要改變原意,不要修改時間軸,不要自行合併或拆分字幕。
+8. 若沒有需要修正的地方,只輸出:沒有需要修正
+
+以下是 SRT：
+`;
+function snap(){hist.push(JSON.stringify(subs));if(hist.length>50)hist.shift()}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function tm(s){let m=s.trim().match(/^(\d+):(\d{2}):(\d{2})[,\.](\d{3})$/);return m?((+m[1]*3600)+(+m[2]*60)+(+m[3]))*1000+(+m[4]):NaN}
+function ft(x){x=Math.max(0,Math.round(x));let h=Math.floor(x/3600000);x%=3600000;let m=Math.floor(x/60000);x%=60000;let s=Math.floor(x/1000);return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+","+String(x%1000).padStart(3,"0")}
+function parse(raw){raw=raw.replace(/^\uFEFF/,"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");return raw.split(/\n{2,}/).map(b=>{let l=b.split("\n");if(l.length<2)return null;let id=l[0].trim(),p=l[1].split("-->");if(p.length<2)return null;return{id,start:p[0].trim(),end:p[1].trim().split(/\s+/)[0],text:l.slice(2).join("\n").trim()}}).filter(Boolean)}
+
+// ---- autosave / crash recovery ----
+function autosave(){try{if(subs.length)localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({subs,base,ts:Date.now()}));else localStorage.removeItem(AUTOSAVE_KEY)}catch(e){}}
+function clearAutosave(){try{localStorage.removeItem(AUTOSAVE_KEY)}catch(e){}}
+function checkRestore(){let raw;try{raw=localStorage.getItem(AUTOSAVE_KEY)}catch(e){return}if(!raw)return;let data;try{data=JSON.parse(raw)}catch(e){clearAutosave();return}if(!data||!Array.isArray(data.subs)||!data.subs.length)return;let when=new Date(data.ts||Date.now()).toLocaleString();$("restoreBar").innerHTML=`<div class="restore"><span>偵測到 ${when} 有未下載完成的編輯紀錄(${data.subs.length} 條字幕)。</span><span class="row"><button id="doRestore" class="primary">復原</button><button id="skipRestore">忽略並清除</button></span></div>`;$("doRestore").onclick=()=>{subs=data.subs;base=data.base||base;cur=subs.length?0:-1;hist=[];$("restoreBar").innerHTML="";render();status("已復原先前的編輯")};$("skipRestore").onclick=()=>{clearAutosave();$("restoreBar").innerHTML=""}}
+
+function render(){ $("count").textContent=subs.length;$("list").innerHTML=subs.length?subs.map((s,i)=>`<div class="item ${i===cur?"active":""}" data-i="${i}"><div class="meta">#${i+1}　${esc(s.start)} → ${esc(s.end)}</div><div class="txt">${esc(s.text)}</div></div>`).join(""):'<div class="hint" style="padding:20px;text-align:center">請先匯入 SRT</div>';document.querySelectorAll(".item").forEach(e=>e.onclick=()=>select(+e.dataset.i));if(cur>=0){$("drop").hidden=true;$("edit").hidden=false;$("et").textContent="字幕 #"+(cur+1);$("pos").textContent=(cur+1)+" / "+subs.length;let s=subs[cur];$("start").value=s.start;$("end").value=s.end;$("text").value=s.text}else{$("drop").hidden=false;$("edit").hidden=true;$("pos").textContent="—"}checks();autosave()}
+function select(i){if(i<0||i>=subs.length)return;cur=i;render();$("text").focus()}
+function save(){if(cur<0)return;snap();saveRaw();render();status("已儲存 #"+(cur+1))}
+function saveRaw(){if(cur>=0){subs[cur].start=$("start").value.trim();subs[cur].end=$("end").value.trim();subs[cur].text=$("text").value}}
+function status(x){$("status").textContent=x}
+function openFile(f){if(!f)return;let r=new FileReader();r.onload=e=>{subs=parse(e.target.result);cur=subs.length?0:-1;hist=[];hits=[];base=f.name.replace(/\.srt$/i,"")||"fixed";render();status("已匯入 "+subs.length+" 條字幕")};r.readAsText(f,"UTF-8")}
+$("open").onclick=()=>$("file").click();$("file").onchange=e=>openFile(e.target.files[0]);
+$("clear").onclick=()=>{if(confirm("確定清空目前 SRT？(自動儲存的紀錄也會一併清除)")){subs=[];cur=-1;hist=[];rules=[];hits=[];clearAutosave();render();$("ai").value="";$("result").innerHTML='<div class="hint">請貼上 AI 修正指令。</div>';$("apply").disabled=true;status("已清空")}};
+$("save").onclick=save;$("prev").onclick=()=>{saveRaw();select(cur-1)};$("next").onclick=()=>{saveRaw();select(cur+1)};
+$("undo").onclick=()=>{if(hist.length){subs=JSON.parse(hist.pop());cur=Math.min(cur,subs.length-1);render();status("已復原")}}
+$("del").onclick=()=>{if(cur<0)return;snap();subs.splice(cur,1);cur=Math.min(cur,subs.length-1);render()}
+$("merge").onclick=()=>{if(cur<0||cur>=subs.length-1)return;snap();subs[cur].end=subs[cur+1].end;subs[cur].text=subs[cur].text.trimEnd()+"\n"+subs[cur+1].text.trimStart();subs.splice(cur+1,1);render()}
+// Premiere-Pro style split: time is divided in half, BOTH halves get the full original text duplicated.
+// No proportional text-position math — you trim each half's text manually afterwards.
+$("split").onclick=()=>{if(cur<0)return;let a=tm(subs[cur].start),b=tm(subs[cur].end);if(Number.isNaN(a)||Number.isNaN(b)||b<=a)return alert("時間格式有誤,無法拆分。");snap();let mid=(a+b)/2,old=subs[cur],fullText=$("text").value;subs[cur].end=ft(mid);subs[cur].text=fullText;subs.splice(cur+1,0,{id:"",start:ft(mid),end:old.end,text:fullText});cur++;render();status("已拆分為兩條,文字皆為原文複本,請分別修剪")}
+$("shiftBtn").onclick=()=>{let sec=+$("shift").value;if(!subs.length)return;snap();subs.forEach(s=>{s.start=ft(tm(s.start)+sec*1000);s.end=ft(tm(s.end)+sec*1000)});render();status("整份字幕已偏移 "+sec+" 秒")}
+
+// ---- rule parsing with optional anchor (編號 / 時間) ----
+function parseRules(){
+  let raw=$("ai").value.replace(/\r/g,""),out=[];
+  for(let b of raw.split(/\n\s*\n/)){
+    let a=b.match(/(?:原文|原句|原字幕)\s*[:：]\s*([\s\S]*?)(?=\n(?:新文|新句|新字幕)\s*[:：])/);
+    let n=b.match(/(?:新文|新句|新字幕)\s*[:：]\s*([\s\S]*)/);
+    if(!a||!n)continue;
+    let numM=b.match(/(?:編號|序號)\s*[:：]\s*(\d+)/);
+    let timeM=b.match(/(?:時間碼|時間點|時間)\s*[:：]\s*(\d+:\d{2}:\d{2}[,\.]\d{3})/);
+    out.push({old:a[1].trim(),nw:n[1].trim(),num:numM?parseInt(numM[1],10):null,time:timeM?timeM[1].replace(".",","):null});
+  }
+  rules=out;
+
+  hits=[];
+  rules.forEach((r,ri)=>{
+    let anchored=false,targetIdx=null,anchorLabel="";
+    if(r.num!=null){
+      anchored=true;anchorLabel="編號 #"+r.num;
+      if(r.num>=1&&r.num<=subs.length)targetIdx=r.num-1;
+    }else if(r.time){
+      anchored=true;anchorLabel="時間 "+r.time;
+      let idx=subs.findIndex(s=>s.start===r.time);
+      if(idx>=0)targetIdx=idx;
+    }
+    if(anchored){
+      let matched=targetIdx!=null&&subs[targetIdx].text.includes(r.old);
+      if(matched){
+        hits.push({id:ri+"_"+targetIdx,ri,si:targetIdx,old:r.old,nw:r.nw,anchored:true,anchorLabel,matched:true,selected:true,error:null,suggested:false});
+      }else{
+        // 指定的編號/時間比對不到,自動搜尋全文找出真正的位置,列為「建議」讓使用者確認
+        let found=[];
+        subs.forEach((s,si)=>{if(s.text.includes(r.old))found.push(si)});
+        if(found.length){
+          found.forEach(si=>{hits.push({id:ri+"_sugg_"+si,ri,si,old:r.old,nw:r.nw,anchored:true,anchorLabel,matched:true,selected:false,error:null,suggested:true})});
+        }else{
+          hits.push({id:ri+"_x",ri,si:-1,old:r.old,nw:r.nw,anchored:true,anchorLabel,matched:false,selected:false,error:"在 "+anchorLabel+" 找不到指定的原文,全文搜尋也找不到這段文字"});
+        }
+      }
+    }else{
+      let any=false;
+      subs.forEach((s,si)=>{if(s.text.includes(r.old)){any=true;hits.push({id:ri+"_"+si,ri,si,old:r.old,nw:r.nw,anchored:false,anchorLabel:"",matched:true,selected:false,error:null})}});
+      if(!any)hits.push({id:ri+"_x",ri,si:-1,old:r.old,nw:r.nw,anchored:false,anchorLabel:"",matched:false,selected:false,error:"沒有比對到任何字幕"});
+    }
+  });
+  renderHits();
+}
+function renderHits(){
+  if(!rules.length){$("result").innerHTML='<div class="check bad">未讀到有效規則</div>';$("apply").disabled=true;return}
+  let globalCount=hits.filter(h=>!h.anchored&&h.matched).length;
+  let suggestCount=hits.filter(h=>h.suggested).length;
+  let head=`<div class="check good">✓ 已解析 ${rules.length} 條規則,共比對到 ${hits.filter(h=>h.matched).length} 處</div>`;
+  if(globalCount)head+=`<div class="check warn">⚠ 其中 ${globalCount} 處沒有提供編號或時間,已列出全部符合的字幕,請自行確認後再勾選,預設不勾選</div>`;
+  if(suggestCount)head+=`<div class="check warn">⚠ 其中 ${suggestCount} 處指定的編號/時間對不到原文(通常是同一句話重複出現,AI 標錯了位置),已自動搜尋全文列出真正符合的位置,請確認後再勾選,預設不勾選</div>`;
+  $("result").innerHTML=head+hits.map(h=>{
+    if(h.error)return `<div class="hitrow mismatch"><span>⚠</span><div><div class="hitmeta">${h.si>=0?"#"+(h.si+1)+" ":""}${h.error}</div><div class="old">− ${esc(h.old)}</div><div class="new">＋ ${esc(h.nw)}</div></div></div>`;
+    let badge=h.suggested?`<span class="badge suggest">原標 ${h.anchorLabel},建議改用</span>`:`<span class="badge ${h.anchored?"anchor":"global"}">${h.anchored?h.anchorLabel:"未定位"}</span>`;
+    return `<div class="hitrow"><input type="checkbox" data-id="${h.id}" ${h.selected?"checked":""}><div><span class="hitmeta" data-jump="${h.si}">#${h.si+1}</span>${badge}<div class="old">− ${esc(h.old)}</div><div class="new">＋ ${esc(h.nw)}</div></div></div>`;
+  }).join("");
+  document.querySelectorAll('[data-id]').forEach(cb=>cb.onchange=()=>{let h=hits.find(x=>x.id===cb.dataset.id);if(h)h.selected=cb.checked;updateApplyState()});
+  document.querySelectorAll('[data-jump]').forEach(el=>el.onclick=()=>select(+el.dataset.jump));
+  updateApplyState();
+}
+function updateApplyState(){let n=hits.filter(h=>h.selected&&h.matched).length;$("apply").disabled=!n;$("apply").textContent=n?`套用已勾選的修正 (${n})`:"套用已勾選的修正"}
+$("parse").onclick=parseRules;
+$("copyPrompt").onclick=()=>{
+  navigator.clipboard.writeText(AI_PROMPT).then(()=>{
+    let b=$("copyPrompt"),old=b.textContent;b.textContent="✓ 已複製,貼給 AI 後面接你的 SRT 內容";
+    setTimeout(()=>b.textContent=old,2000);
+  }).catch(()=>{alert("複製失敗,請手動選取以下內容複製：\n\n"+AI_PROMPT)});
+};
+$("selAll").onclick=()=>{hits.forEach(h=>{if(h.matched)h.selected=true});renderHits()};
+$("selNone").onclick=()=>{hits.forEach(h=>h.selected=false);renderHits()};
+$("apply").onclick=()=>{
+  let selected=hits.filter(h=>h.selected&&h.matched);
+  if(!selected.length)return;
+  if(!confirm(`確定套用已勾選的 ${selected.length} 個修正？`))return;
+  snap();
+  selected.forEach(h=>{let s=subs[h.si];if(s)s.text=s.text.split(h.old).join(h.nw)});
+  render();
+  status("已套用 "+selected.length+" 個字幕修改");
+  hits=[];rules=[];
+  $("result").innerHTML='<div class="hint">已套用完成,如需再次修正請重新貼上規則並解析。</div>';
+  $("apply").disabled=true;
+}
+function checks(){if(!subs.length){$("checks").innerHTML="";return}let a=[];subs.forEach((s,i)=>{let x=tm(s.start),y=tm(s.end);if(Number.isNaN(x)||Number.isNaN(y))a.push("#"+(i+1)+" 時間格式錯誤");else if(y<=x)a.push("#"+(i+1)+" 結束時間異常");if(!s.text.trim())a.push("#"+(i+1)+" 空字幕");if(i&&!Number.isNaN(x)&&x<tm(subs[i-1].end))a.push("#"+(i+1)+" 與上一條重疊")});$("checks").innerHTML=a.length?a.map(x=>`<div class="check bad">${esc(x)}</div>`).join(""):'<div class="check good">✓ 沒有發現明顯時間軸問題</div>'}
+$("download").onclick=()=>{if(!subs.length)return alert("請先匯入 SRT");saveRaw();let out=subs.map((s,i)=>(i+1)+"\n"+s.start+" --> "+s.end+"\n"+s.text).join("\n\n")+"\n",a=document.createElement("a");a.href=URL.createObjectURL(new Blob([out],{type:"text/plain;charset=utf-8"}));a.download=base+"_fixed.srt";a.click();clearAutosave();status("已下載,自動儲存紀錄已清除")}
+document.addEventListener("keydown",e=>{if(e.ctrlKey&&e.key.toLowerCase()=="s"){e.preventDefault();save()}else if(e.ctrlKey&&e.key.toLowerCase()=="z"){e.preventDefault();$("undo").click()}});
+$("drop").onclick=()=>$("file").click();$("drop").ondragover=e=>e.preventDefault();$("drop").ondrop=e=>{e.preventDefault();openFile(e.dataTransfer.files[0])};
+checkRestore();
+</script></body></html>
